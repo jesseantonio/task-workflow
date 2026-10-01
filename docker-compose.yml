@@ -1,0 +1,36 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: task-workflow-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:16
+    container_name: task-workflow-postgres
+    environment:
+      POSTGRES_DB: task_workflow
+      POSTGRES_USER: task_workflow
+      POSTGRES_PASSWORD: task_workflow
+    ports:
+      # 5433 (não 5432): esta máquina já tem um PostgreSQL nativo (Windows Service) ocupando a
+      # porta padrão. Mapear pra 5432 fazia toda conexão externa (inclusive do Spring) cair
+      # nesse Postgres nativo em vez do container, causando "autenticação falhou" (o container
+      # nunca via a conexão). Ver application.yml, que já aponta pra 5433.
+      - "5433:5432"
+    volumes:
+      - task-workflow-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U task_workflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  task-workflow-postgres-data:

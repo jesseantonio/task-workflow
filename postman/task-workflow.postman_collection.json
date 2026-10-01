@@ -1,0 +1,88 @@
+{
+  "info": {
+    "name": "task-workflow",
+    "description": "Coleção pra testar a API do task-workflow (POST /tasks, GET /tasks/{id}). Importe no Postman junto com o Environment incluso nesta pasta.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "taskId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Criar tarefa (simulado)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"minha-primeira-tarefa\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/tasks",
+          "host": ["{{baseUrl}}"],
+          "path": ["tasks"]
+        },
+        "description": "Cria uma tarefa no modo padrão (sem IA real): Review/Test decidem por sorteio (task-workflow.simulation.*)."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 201) {",
+              "    const body = pm.response.json();",
+              "    pm.collectionVariables.set('taskId', body.id);",
+              "    pm.test('status 201 e id presente', () => pm.expect(body.id).to.be.a('string'));",
+              "} else {",
+              "    pm.test('status 201', () => pm.expect(pm.response.code).to.eql(201));",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Criar tarefa (modo repositório real)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"adicionar endpoint de health check\",\n  \"repositoryPath\": \"C:\\\\Users\\\\voce\\\\git\\\\outro-projeto\",\n  \"testCommand\": \"mvn test\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/tasks",
+          "host": ["{{baseUrl}}"],
+          "path": ["tasks"]
+        },
+        "description": "Requer task-workflow.ai.enabled=true no application.yml e o Claude Code CLI instalado/autenticado. repositoryPath deve ser um repositório git local existente nesta máquina. Ajuste o valor antes de enviar."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 201) {",
+              "    const body = pm.response.json();",
+              "    pm.collectionVariables.set('taskId', body.id);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Consultar tarefa",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/tasks/{{taskId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["tasks", "{{taskId}}"]
+        },
+        "description": "Usa o taskId salvo automaticamente pela requisição 'Criar tarefa'. Rode de novo pra acompanhar o status mudando (CREATED -> IN_DEV -> IN_REVIEW -> IN_TEST -> COMPLETED/DEAD)."
+      }
+    }
+  ]
+}

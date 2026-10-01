@@ -1,0 +1,58 @@
+spring:
+  application:
+    name: task-workflow
+
+  datasource:
+    # Porta 5433 (não a padrão 5432): evita conflito com um PostgreSQL nativo já instalado
+    # nesta máquina (ver docker-compose.yml).
+    url: jdbc:postgresql://localhost:5433/task_workflow
+    username: task_workflow
+    password: task_workflow
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    listener:
+      simple:
+        acknowledge-mode: manual
+        concurrency: 3
+        max-concurrency: 10
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 500ms
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+task-workflow:
+  max-attempts: 3
+  simulation:
+    review-approval-rate: 0.7
+    test-success-rate: 0.7
+  ai:
+    # Requer o Claude Code CLI instalado e autenticado na máquina (npm i -g @anthropic-ai/claude-code).
+    # Com true, Development/Review/Test Worker usam o CLI (claude -p) em vez do sorteio acima.
+    enabled: true
+    model: ""
+    timeout-seconds: 120
+    max-budget-usd: 0.50
+
+logging:
+  pattern:
+    console: "%d{HH:mm:ss.SSS} %-5level [%X{correlationId}] %logger{36} - %msg%n"
