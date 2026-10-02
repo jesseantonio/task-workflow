@@ -73,16 +73,31 @@ public class TestWorkerListener {
             succeeded = ThreadLocalRandom.current().nextDouble() < properties.simulation().testSuccessRate();
         }
 
+        // re-busca: a tarefa pode ter sido pausada/cancelada durante a chamada de IA/teste acima
+        String testReport = task.getTestReport();
+        Task current = taskRepository.findById(task.getId()).orElse(null);
+        if (current == null) {
+            log.warn("Task não encontrada ao finalizar os testes. taskId={}", task.getId());
+            return;
+        }
+        current.setTestReport(testReport);
+
         if (succeeded) {
-            task.transitionTo(TaskStatus.COMPLETED, TaskStatus.IN_TEST);
-            taskRepository.save(task);
-            taskPublisher.publish(Exchanges.WORKFLOW, RoutingKeys.TEST_SUCCEEDED, task);
-            log.info("Testes concluídos com sucesso. taskId={}", task.getId());
+            if (!current.transitionTo(TaskStatus.COMPLETED, TaskStatus.IN_TEST)) {
+                log.warn("Tarefa pausada/cancelada/alterada durante os testes, descartando resultado. taskId={}", current.getId());
+                return;
+            }
+            taskRepository.save(current);
+            taskPublisher.publish(Exchanges.WORKFLOW, RoutingKeys.TEST_SUCCEEDED, current);
+            log.info("Testes concluídos com sucesso. taskId={}", current.getId());
         } else {
-            task.transitionTo(TaskStatus.RETRYING, TaskStatus.IN_TEST);
-            taskRepository.save(task);
-            taskPublisher.publish(Exchanges.WORKFLOW, RoutingKeys.TEST_FAILED, task);
-            log.info("Testes falharam. taskId={}", task.getId());
+            if (!current.transitionTo(TaskStatus.RETRYING, TaskStatus.IN_TEST)) {
+                log.warn("Tarefa pausada/cancelada/alterada durante os testes, descartando resultado. taskId={}", current.getId());
+                return;
+            }
+            taskRepository.save(current);
+            taskPublisher.publish(Exchanges.WORKFLOW, RoutingKeys.TEST_FAILED, current);
+            log.info("Testes falharam. taskId={}", current.getId());
         }
     }
 

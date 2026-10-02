@@ -66,6 +66,11 @@ public class Task {
     @Column(length = 500)
     private String testCommand;
 
+    /** Status antes de pausar/cancelar (ver TaskService). */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private TaskStatus pausedFromStatus;
+
     public Task(String name) {
         this.id = UUID.randomUUID();
         this.correlationId = this.id.toString();

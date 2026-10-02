@@ -185,10 +185,27 @@ com.taskworkflow
 
 ## 5. Como executar
 
-```bash
-docker compose up -d
-mvn spring-boot:run
+**Tudo via Docker Compose** (RabbitMQ + Postgres + backend + [frontend](frontend/)):
 
+```bash
+docker compose up -d --build
+```
+
+Frontend em `http://localhost:5173`, API em `http://localhost:8080`. Nesse modo a IA fica
+desligada (`task-workflow.ai.enabled=false`) — o CLI do Claude Code precisa de login OAuth feito
+na máquina, e isso não dá pra automatizar dentro do container; os workers usam a simulação
+aleatória (`task-workflow.simulation.*`).
+
+**Com IA real**: suba só a infra pelo compose e rode o backend direto na máquina (que já tem o
+CLI autenticado):
+
+```bash
+docker compose up -d postgres rabbitmq
+mvn spring-boot:run
+cd frontend && npm run dev   # http://localhost:5173 (Vite dev server, com hot reload)
+```
+
+```bash
 curl -X POST http://localhost:8080/tasks -H "Content-Type: application/json" -d "{\"name\":\"minha-tarefa\"}"
 curl http://localhost:8080/tasks/{id}
 ```
@@ -209,7 +226,8 @@ Para habilitar a IA: `npm install -g @anthropic-ai/claude-code`, autenticar (`cl
 
 ## 6. Notas operacionais
 
-- A porta do PostgreSQL no `docker-compose.yml` é `5433`, não a padrão `5432` — evita conflito com instalações nativas do Postgres na mesma máquina.
+- A porta do PostgreSQL no `docker-compose.yml` é `5433`, não a padrão `5432` — evita conflito com instalações nativas do Postgres na mesma máquina. O serviço `backend` do compose fala com o Postgres pela porta interna da rede Docker (`5432`), não pela `5433` (que é só o mapeamento pro host).
+- `Dockerfile` (backend) e `frontend/Dockerfile` são builds multi-stage; o backend inclui `git` na imagem final (necessário pro `GitService` em modo repositório real) mas não o CLI do Claude Code. `docker-compose.yml` monta `./test-html` em `/workspace/test-html` dentro do container do backend, então dá pra usar esse caminho como `repositoryPath` mesmo rodando containerizado (sem IA real, só serve pra exercitar o fluxo de patch/branch com a simulação).
 - No Windows, o `claude` instalado via npm é um script `.cmd` que aponta para um `.exe` nativo; o `ClaudeCodeClient` resolve e chama esse `.exe` diretamente (via `PATH`, nunca hardcoded), e escapa aspas duplas nos argumentos — o `ProcessBuilder` do Java no Windows corrompe aspas embutidas em argumentos ao montar a linha de comando.
 - `GitService.applyPatch` usa `git apply --recount`: LLMs costumam errar a contagem de linhas no cabeçalho do hunk do diff; essa flag deixa o git recalcular.
 - `TaskPublisher` adia a publicação no RabbitMQ para depois do commit da transação (`TransactionSynchronizationManager`) — sem isso, um consumidor pode processar a mensagem antes da tarefa estar visível no banco.

@@ -12,6 +12,8 @@ package com.taskworkflow.domain;
  *                          v (attempts >= maxAttempts)
  *                         DEAD
  * </pre>
+ *
+ * PAUSED e CANCELLED são estados administrativos (ver TaskService).
  */
 public enum TaskStatus {
     CREATED,
@@ -20,5 +22,7 @@ public enum TaskStatus {
     IN_TEST,
     RETRYING,
     COMPLETED,
-    DEAD
+    DEAD,
+    PAUSED,
+    CANCELLED
 }

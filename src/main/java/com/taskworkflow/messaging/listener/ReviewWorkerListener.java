@@ -65,16 +65,31 @@ public class ReviewWorkerListener {
             approved = ThreadLocalRandom.current().nextDouble() < properties.simulation().reviewApprovalRate();
         }
 
+        // re-busca: a tarefa pode ter sido pausada/cancelada durante a chamada de IA acima
+        String reviewFeedback = task.getReviewFeedback();
+        Task current = taskRepository.findById(task.getId()).orElse(null);
+        if (current == null) {
+            log.warn("Task não encontrada ao finalizar a revisão. taskId={}", task.getId());
+            return;
+        }
+        current.setReviewFeedback(reviewFeedback);
+
         if (approved) {
-            task.transitionTo(TaskStatus.IN_TEST, TaskStatus.IN_REVIEW);
-            taskRepository.save(task);
-            taskPublisher.publish(Exchanges.WORKFLOW, RoutingKeys.REVIEW_APPROVED, task);
-            log.info("Revisão aprovada. taskId={}", task.getId());
+            if (!current.transitionTo(TaskStatus.IN_TEST, TaskStatus.IN_REVIEW)) {
+                log.warn("Tarefa pausada/cancelada/alterada durante a revisão, descartando resultado. taskId={}", current.getId());
+                return;
+            }
+            taskRepository.save(current);
+            taskPublisher.publish(Exchanges.WORKFLOW, RoutingKeys.REVIEW_APPROVED, current);
+            log.info("Revisão aprovada. taskId={}", current.getId());
         } else {
-            task.transitionTo(TaskStatus.RETRYING, TaskStatus.IN_REVIEW);
-            taskRepository.save(task);
-            taskPublisher.publish(Exchanges.WORKFLOW, RoutingKeys.REVIEW_REJECTED, task);
-            log.info("Revisão rejeitada. taskId={}", task.getId());
+            if (!current.transitionTo(TaskStatus.RETRYING, TaskStatus.IN_REVIEW)) {
+                log.warn("Tarefa pausada/cancelada/alterada durante a revisão, descartando resultado. taskId={}", current.getId());
+                return;
+            }
+            taskRepository.save(current);
+            taskPublisher.publish(Exchanges.WORKFLOW, RoutingKeys.REVIEW_REJECTED, current);
+            log.info("Revisão rejeitada. taskId={}", current.getId());
         }
     }
 }

@@ -32,5 +32,39 @@ services:
       timeout: 5s
       retries: 5
 
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: task-workflow-backend
+    environment:
+      # porta interna do Postgres na rede do compose é 5432, não a 5433 mapeada pro host
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/task_workflow
+      SPRING_DATASOURCE_USERNAME: task_workflow
+      SPRING_DATASOURCE_PASSWORD: task_workflow
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: "5672"
+      # IA requer login OAuth por máquina; não dá pra autenticar dentro do container (ver README)
+      TASK_WORKFLOW_AI_ENABLED: "false"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./test-html:/workspace/test-html
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: task-workflow-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
 volumes:
   task-workflow-postgres-data:

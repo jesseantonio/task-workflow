@@ -65,10 +65,17 @@ public class DevelopmentWorkerListener {
             }
         }
 
-        task.transitionTo(TaskStatus.IN_REVIEW, TaskStatus.IN_DEV);
-        taskRepository.save(task);
-        taskPublisher.publish(Exchanges.WORKFLOW, RoutingKeys.DEVELOPMENT_COMPLETED, task);
-        log.info("Desenvolvimento concluído. taskId={}, attempts={}", task.getId(), task.getAttempts());
+        // re-busca: a tarefa pode ter sido pausada/cancelada durante a chamada de IA acima
+        String developmentOutput = task.getDevelopmentOutput();
+        Task current = taskRepository.findById(task.getId()).orElse(null);
+        if (current == null || !current.transitionTo(TaskStatus.IN_REVIEW, TaskStatus.IN_DEV)) {
+            log.warn("Tarefa pausada/cancelada/alterada durante o desenvolvimento, descartando resultado. taskId={}", task.getId());
+            return;
+        }
+        current.setDevelopmentOutput(developmentOutput);
+        taskRepository.save(current);
+        taskPublisher.publish(Exchanges.WORKFLOW, RoutingKeys.DEVELOPMENT_COMPLETED, current);
+        log.info("Desenvolvimento concluído. taskId={}, attempts={}", current.getId(), current.getAttempts());
     }
 
     private void developInRepository(Task task) {
